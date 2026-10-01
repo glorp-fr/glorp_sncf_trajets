@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {"title": "Clé API SNCF", "description": "Clé gratuite à créer ici : {api_url}", "data": {"api_key": "Clé API"}},
+      "from_station": {"title": "Gare de départ", "data": {"query": "Rechercher une gare"}},
+      "from_pick": {"title": "Gare de départ", "data": {"station": "Gare"}},
+      "to_station": {"title": "Gare d'arrivée", "data": {"query": "Rechercher une gare"}},
+      "to_pick": {"title": "Gare d'arrivée", "data": {"station": "Gare"}},
+      "schedule": {"title": "Plage horaire", "data": {"start": "De", "end": "À", "weekdays": "Jours", "count": "Nombre de trains"}},
+      "notify": {"title": "Notifications", "description": "Appareils mobiles à prévenir en cas de retard ou suppression.", "data": {"notify": "Appareils", "threshold": "Seuil de retard", "quiet_start": "Début du silence", "quiet_end": "Fin du silence"}},
+      "reauth_confirm": {"title": "Nouvelle clé API", "description": "Une nouvelle clé API est nécessaire : {api_url}", "data": {"api_key": "Clé API"}}
+    },
+    "error": {
+      "invalid_auth": "Clé API invalide",
+      "cannot_connect": "API SNCF injoignable",
+      "no_station_found": "Aucune gare trouvée",
+      "same_station": "La gare d'arrivée doit être différente du départ",
+      "no_weekday": "Choisissez au moins un jour"
+    },
+    "abort": {"already_configured": "Ce trajet existe déjà", "reauth_successful": "Clé API mise à jour"}
+  },
+  "options": {
+    "step": {
+      "init": {"title": "Réglages du trajet", "data": {"start": "De", "end": "À", "weekdays": "Jours", "count": "Nombre de trains", "notify": "Appareils", "threshold": "Seuil de retard", "quiet_start": "Début du silence", "quiet_end": "Fin du silence"}}
+    },
+    "error": {"no_weekday": "Choisissez au moins un jour"}
+  },
+  "selector": {
+    "weekdays": {"options": {"mon": "Lundi", "tue": "Mardi", "wed": "Mercredi", "thu": "Jeudi", "fri": "Vendredi", "sat": "Samedi", "sun": "Dimanche"}}
+  },
+  "entity": {
+    "sensor": {
+      "next_train": {"name": "Prochain train"},
+      "train": {"name": "Train {index}", "state": {"on_time": "À l'heure", "delayed": "En retard", "cancelled": "Supprimé"}}
+    },
+    "binary_sensor": {"disruption": {"name": "Perturbation"}}
+  }
+}

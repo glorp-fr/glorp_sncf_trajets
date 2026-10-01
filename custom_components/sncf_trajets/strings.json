@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {"title": "SNCF API key", "description": "Free key to create here: {api_url}", "data": {"api_key": "API key"}},
+      "from_station": {"title": "Departure station", "data": {"query": "Search a station"}},
+      "from_pick": {"title": "Departure station", "data": {"station": "Station"}},
+      "to_station": {"title": "Arrival station", "data": {"query": "Search a station"}},
+      "to_pick": {"title": "Arrival station", "data": {"station": "Station"}},
+      "schedule": {"title": "Time window", "data": {"start": "From", "end": "To", "weekdays": "Days", "count": "Number of trains"}},
+      "notify": {"title": "Notifications", "description": "Mobile devices to notify on delay or cancellation.", "data": {"notify": "Devices", "threshold": "Delay threshold", "quiet_start": "Quiet hours start", "quiet_end": "Quiet hours end"}},
+      "reauth_confirm": {"title": "New API key", "description": "A new API key is required: {api_url}", "data": {"api_key": "API key"}}
+    },
+    "error": {
+      "invalid_auth": "Invalid API key",
+      "cannot_connect": "Cannot reach the SNCF API",
+      "no_station_found": "No station found",
+      "same_station": "Arrival must differ from departure",
+      "no_weekday": "Select at least one day"
+    },
+    "abort": {"already_configured": "This trajet already exists", "reauth_successful": "API key updated"}
+  },
+  "options": {
+    "step": {
+      "init": {"title": "Trajet settings", "data": {"start": "From", "end": "To", "weekdays": "Days", "count": "Number of trains", "notify": "Devices", "threshold": "Delay threshold", "quiet_start": "Quiet hours start", "quiet_end": "Quiet hours end"}}
+    },
+    "error": {"no_weekday": "Select at least one day"}
+  },
+  "selector": {
+    "weekdays": {"options": {"mon": "Monday", "tue": "Tuesday", "wed": "Wednesday", "thu": "Thursday", "fri": "Friday", "sat": "Saturday", "sun": "Sunday"}}
+  },
+  "entity": {
+    "sensor": {
+      "next_train": {"name": "Next train"},
+      "train": {"name": "Train {index}", "state": {"on_time": "On time", "delayed": "Delayed", "cancelled": "Cancelled"}}
+    },
+    "binary_sensor": {"disruption": {"name": "Disruption"}}
+  }
+}
