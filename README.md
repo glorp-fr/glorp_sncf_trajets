@@ -1,4 +1,4 @@
-# SNCF Trajets
+# Glorp SNCF Trajets
 
 Intégration Home Assistant (HACS) pour suivre vos trajets SNCF du quotidien : les prochains trains **directs** d'un trajet dans une plage horaire, leur état en temps réel (retard, suppression), une carte Lovelace compacte et des notifications push sur l'application mobile.
 
@@ -16,9 +16,9 @@ Données : API SNCF (Navitia, couverture `sncf`), en temps réel.
 ## Installation (HACS)
 
 1. HACS, menu ⋮, **Dépôts personnalisés**.
-2. Dépôt : `https://github.com/glorp-fr/ha-sncf-trajets`, catégorie **Intégration**.
-3. Installer **SNCF Trajets**, puis redémarrer Home Assistant.
-4. Paramètres, Appareils et services, **Ajouter une intégration**, **SNCF Trajets**.
+2. Dépôt : `https://github.com/glorp-fr/glorp_sncf_trajets`, catégorie **Intégration**.
+3. Installer **Glorp SNCF Trajets**, puis redémarrer Home Assistant.
+4. Paramètres, Appareils et services, **Ajouter une intégration**, **Glorp SNCF Trajets**.
 
 ## Clé API
 

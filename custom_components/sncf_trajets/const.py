@@ -4,7 +4,7 @@ from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 DOMAIN = "sncf_trajets"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 API_BASE = "https://api.sncf.com/v1/coverage/sncf"
 NAVITIA_TZ = ZoneInfo("Europe/Paris")

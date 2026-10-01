@@ -1,5 +1,5 @@
-/* SNCF Trajets card — compact list */
-const VERSION = "0.1.0";
+/* Glorp SNCF Trajets card — compact list */
+const VERSION = "0.1.1";
 const TZ = "Europe/Paris";
 
 const esc = (s) =>
@@ -154,7 +154,7 @@ if (!customElements.get("sncf-trajets-card")) {
   window.customCards = window.customCards || [];
   window.customCards.push({
     type: "sncf-trajets-card",
-    name: "SNCF Trajets",
+    name: "Glorp SNCF Trajets",
     description: "Prochains trains et perturbations d'un trajet SNCF",
     preview: true,
   });

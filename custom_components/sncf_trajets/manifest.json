@@ -1,14 +1,14 @@
 {
   "domain": "sncf_trajets",
-  "name": "SNCF Trajets",
+  "name": "Glorp SNCF Trajets",
   "after_dependencies": ["lovelace"],
   "codeowners": ["@glorp-fr"],
   "config_flow": true,
   "dependencies": ["http"],
-  "documentation": "https://github.com/glorp-fr/ha-sncf-trajets",
+  "documentation": "https://github.com/glorp-fr/glorp_sncf_trajets",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/glorp-fr/ha-sncf-trajets/issues",
+  "issue_tracker": "https://github.com/glorp-fr/glorp_sncf_trajets/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.1.1"
 }
