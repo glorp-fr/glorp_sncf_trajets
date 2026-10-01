@@ -65,6 +65,9 @@ lovelace:
       type: module
 ```
 
+> **Erreur « Custom element doesn't exist: sncf-trajets-card » ?**
+> Après l'installation ou une mise à jour, le navigateur et surtout l'application mobile Home Assistant (Android/iOS) gardent en cache l'ancienne liste des ressources du dashboard. Rechargez la page (Ctrl+F5) sur ordinateur ; sur mobile, **fermez complètement l'application puis rouvrez-la** (si besoin : Paramètres → Application compagnon → Dépannage → Réinitialiser le cache du frontend).
+
 ## Notifications
 
 Les notifications sont envoyées aux services `notify.mobile_app_*` choisis dans la configuration, à chaque changement d'état d'un train suivi, sans doublon :
