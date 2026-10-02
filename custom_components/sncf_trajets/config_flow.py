@@ -1,4 +1,4 @@
-"""Config flow for SNCF Trajets."""
+"""Config flow for Glorp SNCF Trajets."""
 
 from __future__ import annotations
 

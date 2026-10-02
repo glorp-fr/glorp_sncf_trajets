@@ -1,7 +1,7 @@
-# SNCF Trajets — intégration Home Assistant (HACS) — Design
+# Glorp SNCF Trajets — intégration Home Assistant (HACS) — Design
 
 Date : 2026-10-01
-Dépôt : `glorp-fr/ha-sncf-trajets` (public)
+Dépôt : `glorp-fr/glorp_sncf_trajets` (public)
 Domaine HA : `sncf_trajets`
 
 ## 1. Objectif
@@ -195,6 +195,6 @@ Aucun appel API n'est fait plus d'une fois par 60 s par trajet (garde-fou).
 
 ## 10. Publication
 
-- Dépôt public `glorp-fr/ha-sncf-trajets`, `hacs.json` (`name: "SNCF Trajets"`, `render_readme: true`, `homeassistant` version minimale).
+- Dépôt public `glorp-fr/glorp_sncf_trajets`, `hacs.json` (`name: "Glorp SNCF Trajets"`, `render_readme: true`, `homeassistant` version minimale).
 - README en français : installation HACS (dépôt personnalisé), obtention de la clé API, configuration, carte, exemples d'automatisation sur `sncf_trajets_alert`.
 - Release GitHub `v0.1.0` pour que HACS propose la version.

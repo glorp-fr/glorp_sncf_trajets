@@ -1,4 +1,4 @@
-# SNCF Trajets Implementation Plan
+# Glorp SNCF Trajets Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -100,15 +100,15 @@ testpaths = ["tests"]
 ```json
 {
   "domain": "sncf_trajets",
-  "name": "SNCF Trajets",
+  "name": "Glorp SNCF Trajets",
   "after_dependencies": ["lovelace"],
   "codeowners": ["@glorp-fr"],
   "config_flow": true,
   "dependencies": ["http"],
-  "documentation": "https://github.com/glorp-fr/ha-sncf-trajets",
+  "documentation": "https://github.com/glorp-fr/glorp_sncf_trajets",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/glorp-fr/ha-sncf-trajets/issues",
+  "issue_tracker": "https://github.com/glorp-fr/glorp_sncf_trajets/issues",
   "requirements": [],
   "version": "0.1.0"
 }
@@ -116,12 +116,12 @@ testpaths = ["tests"]
 
 `custom_components/sncf_trajets/__init__.py` :
 ```python
-"""SNCF Trajets integration."""
+"""Glorp SNCF Trajets integration."""
 ```
 
 `custom_components/sncf_trajets/const.py` :
 ```python
-"""Constants for SNCF Trajets."""
+"""Constants for Glorp SNCF Trajets."""
 
 from datetime import timedelta
 from zoneinfo import ZoneInfo
@@ -166,7 +166,7 @@ EVENT_ALERT = "sncf_trajets_alert"
 CARD_URL = "/sncf_trajets/sncf-trajets-card.js"
 ```
 
-`tests/__init__.py` : `"""Tests for SNCF Trajets."""`
+`tests/__init__.py` : `"""Tests for Glorp SNCF Trajets."""`
 
 `tests/conftest.py` :
 ```python
@@ -1715,7 +1715,7 @@ async def test_reauth(hass):
 - [ ] **Step 3: Implement** — `custom_components/sncf_trajets/config_flow.py`
 
 ```python
-"""Config flow for SNCF Trajets."""
+"""Config flow for Glorp SNCF Trajets."""
 
 from __future__ import annotations
 
@@ -2152,7 +2152,7 @@ async def test_unload(hass, freezer):
 
 `custom_components/sncf_trajets/__init__.py`:
 ```python
-"""SNCF Trajets integration."""
+"""Glorp SNCF Trajets integration."""
 
 from __future__ import annotations
 
@@ -2480,7 +2480,7 @@ test("escapes html", () => {
 - [ ] **Step 3: Implement** — `custom_components/sncf_trajets/www/sncf-trajets-card.js`
 
 ```js
-/* SNCF Trajets card — compact list */
+/* Glorp SNCF Trajets card — compact list */
 const VERSION = "0.1.0";
 const TZ = "Europe/Paris";
 
@@ -2612,7 +2612,7 @@ if (!customElements.get("sncf-trajets-card")) {
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "sncf-trajets-card",
-  name: "SNCF Trajets",
+  name: "Glorp SNCF Trajets",
   description: "Prochains trains et perturbations d'un trajet SNCF",
   preview: true,
 });
@@ -2639,7 +2639,7 @@ git commit -m "feat: carte Lovelace liste compacte"
 
 ```json
 {
-  "name": "SNCF Trajets",
+  "name": "Glorp SNCF Trajets",
   "render_readme": true,
   "homeassistant": "2025.1.0"
 }
@@ -2694,7 +2694,7 @@ jobs:
           ignore: brands
 ```
 
-- [ ] **Step 4: `README.md`** (French) with sections: présentation (capture ASCII de la carte), installation HACS (dépôt personnalisé `https://github.com/glorp-fr/ha-sncf-trajets`, catégorie Intégration), clé API (à récupérer ici : https://numerique.sncf.com/startup/api/token-developpeur/), configuration (étapes de l'assistant), entités créées (tableau), carte (`type: custom:sncf-trajets-card` + `entity`, ressource auto ; en mode YAML ajouter `/sncf_trajets/sncf-trajets-card.js` type module), notifications (types et exemples de messages du §6.1 de la spec, heures de silence), automatisation exemple :
+- [ ] **Step 4: `README.md`** (French) with sections: présentation (capture ASCII de la carte), installation HACS (dépôt personnalisé `https://github.com/glorp-fr/glorp_sncf_trajets`, catégorie Intégration), clé API (à récupérer ici : https://numerique.sncf.com/startup/api/token-developpeur/), configuration (étapes de l'assistant), entités créées (tableau), carte (`type: custom:sncf-trajets-card` + `entity`, ressource auto ; en mode YAML ajouter `/sncf_trajets/sncf-trajets-card.js` type module), notifications (types et exemples de messages du §6.1 de la spec, heures de silence), automatisation exemple :
 
 ```yaml
 automation:
@@ -2750,7 +2750,7 @@ asyncio.run(main())
 
 Run: `SNCF_KEY=... .venv/bin/python <scratchpad>/smoke.py` — expected: two stations, a list of TER trains with sane times.
 
-- [ ] **Step 2: Publish** — `gh repo create glorp-fr/ha-sncf-trajets --public --source . --push --description "Intégration Home Assistant (HACS) : horaires et perturbations SNCF par trajet, carte Lovelace et notifications mobiles"`; then `gh release create v0.1.0 --title "v0.1.0" --notes "Première version"`; check CI with `gh run list`.
+- [ ] **Step 2: Publish** — `gh repo create glorp-fr/glorp_sncf_trajets --public --source . --push --description "Intégration Home Assistant (HACS) : horaires et perturbations SNCF par trajet, carte Lovelace et notifications mobiles"`; then `gh release create v0.1.0 --title "v0.1.0" --notes "Première version"`; check CI with `gh run list`.
 
 - [ ] **Step 3: Notify interested people** (out of scope of the repo).
 

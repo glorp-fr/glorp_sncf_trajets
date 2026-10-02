@@ -108,6 +108,10 @@ automation:
 - Trains directs uniquement (pas de correspondance), pas d'information de voie.
 - Couverture `sncf` de Navitia uniquement ; configuration par l'interface uniquement.
 
+## Historique du nom
+
+Depuis la v0.1.1, le projet s'appelle **Glorp SNCF Trajets** et le dépôt `glorp-fr/glorp_sncf_trajets` (auparavant « SNCF Trajets », dépôt `glorp-fr/ha-sncf-trajets` ; GitHub redirige l'ancienne adresse). Le domaine de l'intégration (`sncf_trajets`), les entités et le type de carte (`custom:sncf-trajets-card`) sont inchangés : une installation existante se met à jour normalement depuis HACS, sans reconfiguration. Pensez à fermer/rouvrir l'application mobile après la mise à jour (voir la note de la section « Carte Lovelace »).
+
 ## Développement
 
 ```bash

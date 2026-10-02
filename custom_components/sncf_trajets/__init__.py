@@ -1,4 +1,4 @@
-"""SNCF Trajets integration."""
+"""Glorp SNCF Trajets integration."""
 
 from __future__ import annotations
 

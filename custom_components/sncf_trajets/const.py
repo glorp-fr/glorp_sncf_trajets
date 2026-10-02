@@ -1,4 +1,4 @@
-"""Constants for SNCF Trajets."""
+"""Constants for Glorp SNCF Trajets."""
 
 from datetime import timedelta
 from zoneinfo import ZoneInfo
