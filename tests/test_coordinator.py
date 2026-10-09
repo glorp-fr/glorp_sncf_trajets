@@ -1,6 +1,7 @@
 """Tests for the coordinator."""
 
 from dataclasses import replace
+import logging
 from datetime import timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
@@ -227,3 +228,35 @@ async def test_no_uic_no_board_call(setup, freezer):
     client.get_trains.return_value = trains(("B", 7, 42, 0))
     await coord._async_update_data()
     coord.boards.get_platforms.assert_not_awaited()
+
+
+async def test_board_error_warns_once_until_recovery(setup_uic, freezer, caplog):
+    coord, client, boards, _ = setup_uic
+    client.get_trains.return_value = trains(("B", 7, 42, 0))
+    msg = "Tableau des départs indisponible"
+    freezer.move_to(at(7, 35))
+    boards.get_platforms.side_effect = BoardError("HTTP 403")
+    await coord._async_update_data()
+    await coord._async_update_data()
+    warnings = [r for r in caplog.records if msg in r.getMessage() and r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    boards.get_platforms.side_effect = None
+    boards.get_platforms.return_value = board(("B", 7, 42, "B"))
+    await coord._async_update_data()
+    boards.get_platforms.side_effect = BoardError("HTTP 403")
+    await coord._async_update_data()
+    warnings = [r for r in caplog.records if msg in r.getMessage() and r.levelno == logging.WARNING]
+    assert len(warnings) == 2
+
+
+async def test_unexpected_board_error_keeps_platform(setup_uic, freezer):
+    coord, client, boards, _ = setup_uic
+    client.get_trains.return_value = trains(("B", 7, 42, 0))
+    freezer.move_to(at(7, 33))
+    boards.get_platforms.return_value = board(("B", 7, 42, "B"))
+    await coord._async_update_data()
+    freezer.move_to(at(7, 35))
+    boards.get_platforms.side_effect = RuntimeError("boom")
+    data = await coord._async_update_data()
+    assert data.trains[0].platform == "B"
+    assert data.stale is False

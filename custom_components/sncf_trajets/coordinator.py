@@ -59,11 +59,17 @@ class SncfTrajetCoordinator(DataUpdateCoordinator[TrajetData]):
         self.boards = boards
         self._failures = 0
         self._platforms: dict[str, str] = {}
+        self._board_failing = False
 
     @property
     def opts(self) -> dict:
         """Entry data merged with options."""
         return {**self.config_entry.data, **self.config_entry.options}
+
+    def _log_board_failure(self, msg: str, err: Exception) -> None:
+        """Warn on the first consecutive board failure, then stay at debug."""
+        _LOGGER.log(logging.DEBUG if self._board_failing else logging.WARNING, msg, err)
+        self._board_failing = True
 
     async def _async_add_platforms(self, trains: list[Train], now: datetime) -> list[Train]:
         """Fetch tracks for trains leaving within PLATFORM_LEAD; keep known ones."""
@@ -75,11 +81,16 @@ class SncfTrajetCoordinator(DataUpdateCoordinator[TrajetData]):
             try:
                 board = await self.boards.get_platforms(uic)
             except BoardError as err:
-                _LOGGER.warning("Tableau des départs indisponible (%s), voies conservées", err)
+                self._log_board_failure("Tableau des départs indisponible (%s), voies conservées", err)
+            except Exception as err:  # noqa: BLE001 - the board must never fail the update
+                self._log_board_failure("Tableau des départs en erreur inattendue (%s), voies conservées", err)
             else:
+                self._board_failing = False
                 for t in due:
                     if platform := board.get((t.number, t.base_departure)):
                         self._platforms[t.id] = platform
+                    elif board:
+                        _LOGGER.debug("Voie introuvable au tableau pour %s (%s)", t.number, t.base_departure)
         return [replace(t, platform=self._platforms.get(t.id)) for t in trains]
 
     async def _async_update_data(self) -> TrajetData:
