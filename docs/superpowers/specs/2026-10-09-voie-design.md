@@ -64,7 +64,7 @@ Rapprochement avec un `Train` : `trainNumber == train.number` **et** `scheduledT
   - Conséquence voulue : en mode `next`, un train dont la voie était déjà connue alors qu'il n'était pas encore le prochain (trains espacés de moins de 10 min) reçoit son push « voie » dès qu'il devient le prochain.
   - Les alertes de voie s'ajoutent aux alertes de retard ou de suppression sans les remplacer.
 - Réglage `platform_notify` : `off` | `next` (défaut) | `all`.
-  - `next` : seul le premier train non supprimé de `trains` donne lieu à une alerte `platform`.
+  - `next` : seul le train non supprimé dont le départ réel est le plus proche donne lieu à une alerte `platform`.
   - `off` : aucune alerte `platform`.
   - `platform_changed` n'est jamais filtrée.
 - Messages (`format_message`) :

@@ -93,7 +93,8 @@ def compute_alerts(
     platform_notify: str = DEFAULT_PLATFORM_NOTIFY,
 ) -> list[Alert]:
     """Diff trains against the notified state (mutated in place)."""
-    next_id = next((t.id for t in trains if not t.cancelled), None)
+    nxt = min((t for t in trains if not t.cancelled), key=lambda t: t.departure, default=None)
+    next_id = nxt.id if nxt else None
     alerts: list[Alert] = []
     for train in trains:
         prev = state.setdefault(train.id, {"notified_delay": 0, "cancelled": False})

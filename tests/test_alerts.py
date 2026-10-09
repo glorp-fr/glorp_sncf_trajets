@@ -143,3 +143,10 @@ def test_platform_messages():
     assert format_message(Alert("platform_changed", t2, previous_platform="B"), [t2]) == (
         "⚠️ TER 17716 08:12 : changement de voie B → A"
     )
+
+
+def test_platform_next_is_earliest_real_departure():
+    a = train(delay=30, number="A", h=7, m=42, platform="B")  # leaves 08:12
+    b = train(number="B", h=7, m=50, platform="A")  # leaves 07:50
+    alerts = compute_alerts({}, [a, b], 99)
+    assert [(x.type, x.train.number) for x in alerts] == [("platform", "B")]
