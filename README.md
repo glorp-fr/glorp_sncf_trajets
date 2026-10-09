@@ -42,8 +42,8 @@ Pour chaque trajet :
 
 | Entité | Type | État | Attributs |
 |--------|------|------|-----------|
-| Prochain train | `sensor` (horodatage) | heure de départ réelle du prochain train non supprimé | `trains` (liste : `number`, `mode`, `base_departure`, `departure`, `base_arrival`, `arrival`, `delay_minutes`, `cancelled`, `cause`), `disruptions`, `window_start`, `window_end`, `is_future_window`, `stale`, `last_update`, `from_name`, `to_name`, `threshold` |
-| Train 1 … Train N | `sensor` (énumération) | `à l'heure`, `en retard` (retard supérieur ou égal au seuil) ou `supprimé` | détail du train (mêmes champs que dans `trains`) |
+| Prochain train | `sensor` (horodatage) | heure de départ réelle du prochain train non supprimé | `trains` (liste : `number`, `mode`, `base_departure`, `departure`, `base_arrival`, `arrival`, `delay_minutes`, `cancelled`, `cause`, `platform` : voie, `null` tant qu'elle est inconnue), `disruptions`, `window_start`, `window_end`, `is_future_window`, `stale`, `last_update`, `from_name`, `to_name`, `threshold` |
+| Train 1 … Train N | `sensor` (énumération) | `à l'heure`, `en retard` (retard supérieur ou égal au seuil) ou `supprimé` | détail du train (mêmes champs que dans `trains`, dont `platform`, la voie, `null` tant qu'inconnue) |
 | Perturbation | `binary_sensor` (problème) | actif si un train est en retard au-delà du seuil ou supprimé, ou si l'API signale une perturbation | |
 
 Hors plage horaire, les capteurs affichent les trains de la prochaine plage (`is_future_window`).
@@ -68,6 +68,8 @@ lovelace:
 > **Erreur « Custom element doesn't exist: sncf-trajets-card » ?**
 > Après l'installation ou une mise à jour, le navigateur et surtout l'application mobile Home Assistant (Android/iOS) gardent en cache l'ancienne liste des ressources du dashboard. Rechargez la page (Ctrl+F5) sur ordinateur ; sur mobile, **fermez complètement l'application puis rouvrez-la** (si besoin : Paramètres → Application compagnon → Dépannage → Réinitialiser le cache du frontend).
 
+La voie s'affiche en badge (« Voie B ») sur la ligne du train dès qu'elle est connue, à partir de 10 minutes avant le départ.
+
 ## Notifications
 
 Les notifications sont envoyées aux services `notify.mobile_app_*` choisis dans la configuration, à chaque changement d'état d'un train suivi, sans doublon :
@@ -80,13 +82,15 @@ Les notifications sont envoyées aux services `notify.mobile_app_*` choisis dans
 | `cancelled` | `❌ TER 17716 08:12 SUPPRIMÉ. Panne de signalisation. Prochain train : 08:42` |
 | `restored` | `✅ TER 17716 08:12 rétabli` |
 
+- **Voie** : « 🛤️ TER 17616 08:25 → voie B » quand la voie est annoncée (réglage *Notification de voie* : désactivée / prochain train uniquement — par défaut / tous les trains), et « ⚠️ … changement de voie B → A » (priorité haute) si elle change avant le départ, quel que soit le réglage. Ces notifications ne sont pas différées pendant les heures silencieuses : elles sont abandonnées.
+
 Le titre est `🚆 <Départ> → <Arrivée>`. Les suppressions sont envoyées en priorité haute (niveau d'interruption « time-sensitive » sur iOS).
 
 **Heures de silence** (22:00 à 06:00 par défaut) : aucune notification n'est envoyée ; les alertes sont mises en file, puis, à la fin du silence, un résumé unique (une ligne par train concerné) est envoyé. Si tout est revenu à la normale, rien n'est envoyé.
 
 ### Événement et automatisations
 
-Chaque alerte déclenche aussi, y compris pendant les heures de silence, l'événement `sncf_trajets_alert` avec les champs `entry_id`, `trajet`, `type`, `train_number`, `base_departure`, `departure`, `delay_minutes`, `cause`.
+Chaque alerte déclenche aussi, y compris pendant les heures de silence, l'événement `sncf_trajets_alert` avec les champs `entry_id`, `trajet`, `type`, `train_number`, `base_departure`, `departure`, `delay_minutes`, `cause`, `platform`, `previous_platform`. Les types `platform` (voie annoncée) et `platform_changed` (changement de voie) s'ajoutent aux types ci-dessus ; `previous_platform` n'est renseigné que pour `platform_changed`.
 
 ```yaml
 automation:
@@ -105,7 +109,8 @@ automation:
 ## Quota API et limites
 
 - La fréquence d'interrogation s'adapte (2 min pendant la plage horaire, moins souvent en dehors), soit environ 300 requêtes par jour et par trajet, pour un quota SNCF d'environ 5 000 requêtes par jour et par clé.
-- Trains directs uniquement (pas de correspondance), pas d'information de voie.
+- Trains directs uniquement (pas de correspondance).
+- La voie provient du tableau d'affichage Gares & Connexions (API publique non officielle) : elle n'est demandée que dans les 10 minutes précédant le départ réel d'un train (environ 5 requêtes par train), et son absence ou un refus du site n'affecte jamais le reste des données.
 - Couverture `sncf` de Navitia uniquement ; configuration par l'interface uniquement.
 
 ## Historique du nom

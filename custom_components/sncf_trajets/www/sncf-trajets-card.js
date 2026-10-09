@@ -1,5 +1,5 @@
 /* Glorp SNCF Trajets card — compact list */
-const VERSION = "0.1.1";
+const VERSION = "0.2.0";
 const TZ = "Europe/Paris";
 
 const esc = (s) =>
