@@ -24,11 +24,11 @@ globalThis.window = globalThis;
 await import("../../custom_components/sncf_trajets/www/sncf-trajets-card.js");
 const { renderContent } = globalThis.SncfTrajetsCard;
 
-const t = (number, dep, delay = 0, cancelled = false) => ({
+const t = (number, dep, delay = 0, cancelled = false, platform = null) => ({
   number, mode: "TER",
   base_departure: `2026-10-05T${dep}:00+02:00`,
   departure: new Date(Date.parse(`2026-10-05T${dep}:00+02:00`) + delay * 60000).toISOString(),
-  delay_minutes: delay, cancelled,
+  delay_minutes: delay, cancelled, platform,
 });
 const state = (attrs) => ({
   state: "2026-10-05T05:42:00+00:00",
@@ -129,4 +129,19 @@ test("card re-renders on config change", () => {
   const secondHTML = contentHolder.innerHTML;
 
   assert.notStrictEqual(firstHTML, secondHTML, "should have different HTML after title change");
+});
+
+test("platform badge on on-time and delayed rows only", () => {
+  const html = renderContent(state({ trains: [t("17714", "07:42", 0, false, "B"), t("17716", "08:12", 7, false, "A"), t("17718", "08:42", 0, true, "C"), t("17720", "09:12")] }), {});
+  // split sur '<div class="row' : index 0 = en-tête, 1 = fin de '<div class="rows">', 2..5 = lignes de train
+  const rows = html.split('<div class="row');
+  assert.match(rows[2], /17714[\s\S]*class="platform">Voie B</);
+  assert.match(rows[3], /17716[\s\S]*class="platform">Voie A</);
+  assert.doesNotMatch(rows[4], /Voie/);
+  assert.doesNotMatch(rows[5], /Voie/);
+});
+
+test("platform is escaped", () => {
+  const html = renderContent(state({ trains: [t("17714", "07:42", 0, false, "<img src=x>")] }), {});
+  assert.doesNotMatch(html, /<img/);
 });
