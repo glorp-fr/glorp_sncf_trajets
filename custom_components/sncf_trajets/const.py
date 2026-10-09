@@ -30,6 +30,9 @@ DEFAULT_THRESHOLD = 5
 DEFAULT_WEEKDAYS = ["mon", "tue", "wed", "thu", "fri"]
 DEFAULT_QUIET_START = "22:00:00"
 DEFAULT_QUIET_END = "06:00:00"
+CONF_PLATFORM_NOTIFY = "platform_notify"
+PLATFORM_NOTIFY_MODES = ["off", "next", "all"]
+DEFAULT_PLATFORM_NOTIFY = "next"
 
 DELAY_CHANGE_STEP = 5
 LOOKBACK = timedelta(minutes=30)

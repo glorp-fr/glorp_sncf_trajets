@@ -15,9 +15,9 @@ from custom_components.sncf_trajets.api import parse_journeys
 from .navitia import at, journey, response
 
 
-def train(delay=0, cancelled=False, number="17716", h=8, m=12, cause=None):
+def train(delay=0, cancelled=False, number="17716", h=8, m=12, cause=None, platform=None):
     (t,) = parse_journeys(response([journey(number, at(h, m), delay=delay)]))
-    return replace(t, cancelled=cancelled, cause=cause)
+    return replace(t, cancelled=cancelled, cause=cause, platform=platform)
 
 
 def types(alerts):
@@ -82,3 +82,64 @@ def test_summary():
     assert format_summary([train(), train(delay=2, number="1")], 5) is None
     text = format_summary([train(delay=7), train(cancelled=True, number="17718", m=42)], 5)
     assert text == "⚠️ TER 17716 08:12 +7 min\n❌ TER 17718 08:42 supprimé"
+
+
+def test_platform_first_seen_next_train_only():
+    state = {}
+    a, b = train(platform="B"), train(number="17718", m=20, platform="A")
+    assert [(x.type, x.train.number) for x in compute_alerts(state, [a, b], 5)] == [("platform", "17716")]
+    assert compute_alerts(state, [a, b], 5) == []
+    # 17716 left: 17718 becomes next and gets its push now
+    assert [(x.type, x.train.number) for x in compute_alerts(state, [b], 5)] == [("platform", "17718")]
+
+
+def test_platform_next_skips_cancelled_first_train():
+    alerts = compute_alerts({}, [train(cancelled=True, platform="B"), train(number="17718", m=20, platform="A")], 5)
+    assert [(x.type, x.train.number) for x in alerts] == [("cancelled", "17716"), ("platform", "17718")]
+
+
+def test_platform_modes_all_and_off():
+    ts = [train(platform="B"), train(number="17718", m=20, platform="A")]
+    assert types(compute_alerts({}, ts, 5, "all")) == ["platform", "platform"]
+    assert compute_alerts({}, ts, 5, "off") == []
+
+
+def test_platform_changed_always_emitted():
+    state = {}
+    compute_alerts(state, [train(platform="B")], 5, "off")
+    alerts = compute_alerts(state, [train(platform="A")], 5, "off")
+    assert types(alerts) == ["platform_changed"]
+    assert alerts[0].previous_platform == "B"
+    assert compute_alerts(state, [train(platform="A")], 5, "next") == []  # no late "platform" push after a change
+
+
+def test_platform_change_on_non_next_train():
+    state = {}
+    first, other = train(platform="B"), train(number="17718", m=20, platform="A")
+    compute_alerts(state, [first, other], 5)
+    alerts = compute_alerts(state, [first, replace(other, platform="C")], 5)
+    assert [(x.type, x.train.number) for x in alerts] == [("platform_changed", "17718")]
+
+
+def test_platform_with_delay_both_alerts():
+    assert types(compute_alerts({}, [train(delay=7, platform="B")], 5)) == ["delay", "platform"]
+
+
+def test_cancelled_train_no_platform_alert():
+    state = {}
+    compute_alerts(state, [train(platform="B")], 5)
+    assert types(compute_alerts(state, [train(cancelled=True, platform="A")], 5)) == ["cancelled"]
+
+
+def test_old_state_without_platform_keys():
+    state = {"17716_20261005T0812": {"notified_delay": 0, "cancelled": False, "base_departure": at(8, 12).isoformat()}}
+    assert types(compute_alerts(state, [train(platform="B")], 5)) == ["platform"]
+
+
+def test_platform_messages():
+    t = train(platform="B")
+    assert format_message(Alert("platform", t), [t]) == "🛤️ TER 17716 08:12 → voie B"
+    t2 = train(platform="A")
+    assert format_message(Alert("platform_changed", t2, previous_platform="B"), [t2]) == (
+        "⚠️ TER 17716 08:12 : changement de voie B → A"
+    )
