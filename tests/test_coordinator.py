@@ -1,7 +1,8 @@
 """Tests for the coordinator."""
 
 from dataclasses import replace
-from datetime import timedelta
+import logging
+from datetime import timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -10,6 +11,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.sncf_trajets.api import SncfApiError, SncfAuthError, parse_journeys
+from custom_components.sncf_trajets.boards import BoardError
 from custom_components.sncf_trajets.const import DOMAIN
 from custom_components.sncf_trajets.coordinator import SncfTrajetCoordinator
 
@@ -29,7 +31,30 @@ def setup(hass):
     client.get_trains = AsyncMock()
     notifier = MagicMock()
     notifier.async_process = AsyncMock()
-    return SncfTrajetCoordinator(hass, entry, client, notifier), client, notifier
+    boards = MagicMock()
+    boards.get_platforms = AsyncMock(return_value={})
+    return SncfTrajetCoordinator(hass, entry, client, notifier, boards), client, notifier
+
+
+@pytest.fixture
+def setup_uic(hass):
+    """Coordinator on a real-looking stop_area id (UIC available)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="A → B", data={**DATA, "from_id": "stop_area:SNCF:87723395"}, entry_id="e2"
+    )
+    entry.add_to_hass(hass)
+    client = MagicMock()
+    client.get_trains = AsyncMock()
+    notifier = MagicMock()
+    notifier.async_process = AsyncMock()
+    boards = MagicMock()
+    boards.get_platforms = AsyncMock(return_value={})
+    return SncfTrajetCoordinator(hass, entry, client, notifier, boards), client, boards, notifier
+
+
+def board(*entries):
+    """{(number, base departure): track} as parse_board returns it (UTC keys)."""
+    return {(n, at(h, m).astimezone(timezone.utc)): track for n, h, m, track in entries}
 
 
 async def test_future_window_filtered_and_limited(setup, freezer):
@@ -125,3 +150,113 @@ async def test_stale_data_drops_departed_trains(setup, freezer):
     assert data.stale is True
     assert [t.number for t in data.trains] == ["C"]
     assert data.disruptions == ["Grève"]
+
+
+async def test_no_board_call_outside_lead(setup_uic, freezer):
+    coord, client, boards, _ = setup_uic
+    freezer.move_to(at(7, 31))
+    client.get_trains.return_value = trains(("B", 7, 42, 0))
+    data = await coord._async_update_data()
+    boards.get_platforms.assert_not_awaited()
+    assert data.trains[0].platform is None
+
+
+async def test_due_train_gets_platform(setup_uic, freezer):
+    coord, client, boards, notifier = setup_uic
+    freezer.move_to(at(7, 33))
+    client.get_trains.return_value = trains(("B", 7, 42, 0), ("C", 8, 12, 0))
+    boards.get_platforms.return_value = board(("B", 7, 42, "B"), ("C", 8, 12, "A"))
+    data = await coord._async_update_data()
+    boards.get_platforms.assert_awaited_once_with("87723395")
+    assert [t.platform for t in data.trains] == ["B", None]  # C not due yet
+    passed = notifier.async_process.await_args.args[0]
+    assert passed[0].platform == "B"
+    assert data.trains[0].as_dict()["platform"] == "B"
+
+
+async def test_platform_change_and_kept_when_missing(setup_uic, freezer):
+    coord, client, boards, _ = setup_uic
+    client.get_trains.return_value = trains(("B", 7, 42, 0))
+    freezer.move_to(at(7, 33))
+    boards.get_platforms.return_value = board(("B", 7, 42, "B"))
+    await coord._async_update_data()
+    freezer.move_to(at(7, 35))
+    boards.get_platforms.return_value = board(("B", 7, 42, "A"))
+    assert (await coord._async_update_data()).trains[0].platform == "A"
+    freezer.move_to(at(7, 37))
+    boards.get_platforms.return_value = {}
+    assert (await coord._async_update_data()).trains[0].platform == "A"
+
+
+async def test_board_error_keeps_platform_not_stale(setup_uic, freezer):
+    coord, client, boards, _ = setup_uic
+    client.get_trains.return_value = trains(("B", 7, 42, 0))
+    freezer.move_to(at(7, 33))
+    boards.get_platforms.return_value = board(("B", 7, 42, "B"))
+    await coord._async_update_data()
+    freezer.move_to(at(7, 35))
+    boards.get_platforms.side_effect = BoardError("HTTP 403")
+    data = await coord._async_update_data()
+    assert data.trains[0].platform == "B"
+    assert data.stale is False
+    assert coord.update_interval == timedelta(minutes=2)
+
+
+async def test_window_follows_real_departure(setup_uic, freezer):
+    coord, client, boards, _ = setup_uic
+    # 7:42 + 20 min delay -> leaves 8:02, lead window opens 7:52
+    client.get_trains.return_value = trains(("B", 7, 42, 20))
+    boards.get_platforms.return_value = board(("B", 7, 42, "B"))
+    freezer.move_to(at(7, 40))
+    assert (await coord._async_update_data()).trains[0].platform is None
+    boards.get_platforms.assert_not_awaited()
+    freezer.move_to(at(7, 53))
+    assert (await coord._async_update_data()).trains[0].platform == "B"
+
+
+async def test_cancelled_train_not_due(setup_uic, freezer):
+    coord, client, boards, _ = setup_uic
+    freezer.move_to(at(7, 35))
+    client.get_trains.return_value = [replace(t, cancelled=True) for t in trains(("B", 7, 42, 0))]
+    await coord._async_update_data()
+    boards.get_platforms.assert_not_awaited()
+
+
+async def test_no_uic_no_board_call(setup, freezer):
+    coord, client, _ = setup
+    freezer.move_to(at(7, 35))
+    client.get_trains.return_value = trains(("B", 7, 42, 0))
+    await coord._async_update_data()
+    coord.boards.get_platforms.assert_not_awaited()
+
+
+async def test_board_error_warns_once_until_recovery(setup_uic, freezer, caplog):
+    coord, client, boards, _ = setup_uic
+    client.get_trains.return_value = trains(("B", 7, 42, 0))
+    msg = "Tableau des départs indisponible"
+    freezer.move_to(at(7, 35))
+    boards.get_platforms.side_effect = BoardError("HTTP 403")
+    await coord._async_update_data()
+    await coord._async_update_data()
+    warnings = [r for r in caplog.records if msg in r.getMessage() and r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    boards.get_platforms.side_effect = None
+    boards.get_platforms.return_value = board(("B", 7, 42, "B"))
+    await coord._async_update_data()
+    boards.get_platforms.side_effect = BoardError("HTTP 403")
+    await coord._async_update_data()
+    warnings = [r for r in caplog.records if msg in r.getMessage() and r.levelno == logging.WARNING]
+    assert len(warnings) == 2
+
+
+async def test_unexpected_board_error_keeps_platform(setup_uic, freezer):
+    coord, client, boards, _ = setup_uic
+    client.get_trains.return_value = trains(("B", 7, 42, 0))
+    freezer.move_to(at(7, 33))
+    boards.get_platforms.return_value = board(("B", 7, 42, "B"))
+    await coord._async_update_data()
+    freezer.move_to(at(7, 35))
+    boards.get_platforms.side_effect = RuntimeError("boom")
+    data = await coord._async_update_data()
+    assert data.trains[0].platform == "B"
+    assert data.stale is False

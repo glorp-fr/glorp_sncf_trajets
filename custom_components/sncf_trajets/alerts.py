@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -12,9 +13,11 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     CONF_NOTIFY,
+    CONF_PLATFORM_NOTIFY,
     CONF_QUIET_END,
     CONF_QUIET_START,
     CONF_THRESHOLD,
+    DEFAULT_PLATFORM_NOTIFY,
     DEFAULT_QUIET_END,
     DEFAULT_QUIET_START,
     DEFAULT_THRESHOLD,
@@ -35,37 +38,72 @@ KEEP_STATE = timedelta(hours=12)
 class Alert:
     """A state change worth notifying."""
 
-    type: str  # delay, delay_changed, on_time, cancelled, restored
+    type: str  # delay, delay_changed, on_time, cancelled, restored, platform, platform_changed
     train: Train
+    previous_platform: str | None = None
 
 
-def compute_alerts(state: dict[str, dict], trains: list[Train], threshold: int) -> list[Alert]:
+PLATFORM_ALERTS = ("platform", "platform_changed")
+
+
+def _status_alert(prev: dict, train: Train, threshold: int) -> str | None:
+    """Delay / cancellation transition (mutates prev)."""
+    delay = train.delay_minutes
+    if train.cancelled:
+        if prev["cancelled"]:
+            return None
+        prev["cancelled"] = True
+        return "cancelled"
+    if prev["cancelled"]:
+        prev["cancelled"] = False
+        prev["notified_delay"] = delay if delay >= threshold else 0
+        return "restored"
+    notified = prev["notified_delay"]
+    if notified == 0 and delay >= threshold:
+        prev["notified_delay"] = delay
+        return "delay"
+    if notified > 0 and delay >= threshold and abs(delay - notified) >= DELAY_CHANGE_STEP:
+        prev["notified_delay"] = delay
+        return "delay_changed"
+    if notified > 0 and delay < threshold:
+        prev["notified_delay"] = 0
+        return "on_time"
+    return None
+
+
+def _platform_alert(prev: dict, train: Train, eligible: bool) -> Alert | None:
+    """Track announced / changed (mutates prev)."""
+    if train.cancelled or not train.platform:
+        return None
+    seen = prev.get("platform")
+    prev["platform"] = train.platform
+    if seen and seen != train.platform:
+        prev["platform_notified"] = True
+        return Alert("platform_changed", train, previous_platform=seen)
+    if eligible and not prev.get("platform_notified"):
+        prev["platform_notified"] = True
+        return Alert("platform", train)
+    return None
+
+
+def compute_alerts(
+    state: dict[str, dict],
+    trains: list[Train],
+    threshold: int,
+    platform_notify: str = DEFAULT_PLATFORM_NOTIFY,
+) -> list[Alert]:
     """Diff trains against the notified state (mutated in place)."""
+    nxt = min((t for t in trains if not t.cancelled), key=lambda t: t.departure, default=None)
+    next_id = nxt.id if nxt else None
     alerts: list[Alert] = []
     for train in trains:
         prev = state.setdefault(train.id, {"notified_delay": 0, "cancelled": False})
         prev["base_departure"] = train.base_departure.isoformat()
-        delay = train.delay_minutes
-        if train.cancelled:
-            if not prev["cancelled"]:
-                alerts.append(Alert("cancelled", train))
-                prev["cancelled"] = True
-            continue
-        if prev["cancelled"]:
-            alerts.append(Alert("restored", train))
-            prev["cancelled"] = False
-            prev["notified_delay"] = delay if delay >= threshold else 0
-            continue
-        notified = prev["notified_delay"]
-        if notified == 0 and delay >= threshold:
-            alerts.append(Alert("delay", train))
-            prev["notified_delay"] = delay
-        elif notified > 0 and delay >= threshold and abs(delay - notified) >= DELAY_CHANGE_STEP:
-            alerts.append(Alert("delay_changed", train))
-            prev["notified_delay"] = delay
-        elif notified > 0 and delay < threshold:
-            alerts.append(Alert("on_time", train))
-            prev["notified_delay"] = 0
+        if kind := _status_alert(prev, train, threshold):
+            alerts.append(Alert(kind, train))
+        eligible = platform_notify == "all" or (platform_notify == "next" and train.id == next_id)
+        if alert := _platform_alert(prev, train, eligible):
+            alerts.append(alert)
     return alerts
 
 
@@ -100,6 +138,10 @@ def format_message(alert: Alert, trains: list[Train]) -> str:
         return f"✅ {label} de nouveau à l'heure"
     if alert.type == "restored":
         return f"✅ {label} rétabli"
+    if alert.type == "platform":
+        return f"🛤️ {label} → voie {t.platform}"
+    if alert.type == "platform_changed":
+        return f"⚠️ {label} : changement de voie {alert.previous_platform} → {t.platform}"
     parts = [f"❌ {label} SUPPRIMÉ"]
     if t.cause:
         parts.append(t.cause)
@@ -151,10 +193,15 @@ class AlertNotifier:
         """Diff, then notify or queue during quiet hours."""
         opts = self._opts
         threshold = opts.get(CONF_THRESHOLD, DEFAULT_THRESHOLD)
-        known = set(self._state["trains"])
-        changed = purge_state(self._state["trains"], now)
-        alerts = compute_alerts(self._state["trains"], trains, threshold)
-        changed = changed or bool(alerts) or set(self._state["trains"]) != known
+        before = copy.deepcopy(self._state["trains"])
+        purge_state(self._state["trains"], now)
+        alerts = compute_alerts(
+            self._state["trains"],
+            trains,
+            threshold,
+            opts.get(CONF_PLATFORM_NOTIFY, DEFAULT_PLATFORM_NOTIFY),
+        )
+        changed = self._state["trains"] != before
 
         for alert in alerts:
             self._fire_event(alert)
@@ -168,6 +215,8 @@ class AlertNotifier:
         sends: list[tuple[str, str, dict]] = []
         if quiet:
             for alert in alerts:
+                if alert.type in PLATFORM_ALERTS:
+                    continue  # obsolete once the train has left
                 if alert.train.id not in pending:
                     pending.append(alert.train.id)
                     changed = True
@@ -176,7 +225,7 @@ class AlertNotifier:
                 concerned = [t for t in trains if t.id in pending]
                 if summary := format_summary(concerned, threshold):
                     sends.append((summary, f"sncf_summary_{now:%Y%m%d}", {}))
-                alerts = [a for a in alerts if a.train.id not in pending]
+                alerts = [a for a in alerts if a.type in PLATFORM_ALERTS or a.train.id not in pending]
                 pending.clear()
                 changed = True
             sends.extend(self._alert_message(alert, trains) for alert in alerts)
@@ -200,6 +249,8 @@ class AlertNotifier:
                 "departure": t.departure.isoformat(),
                 "delay_minutes": t.delay_minutes,
                 "cause": t.cause,
+                "platform": t.platform,
+                "previous_platform": alert.previous_platform,
             },
         )
 
@@ -207,7 +258,7 @@ class AlertNotifier:
     def _alert_message(alert: Alert, trains: list[Train]) -> tuple[str, str, dict]:
         t = alert.train
         extra = {}
-        if alert.type == "cancelled":
+        if alert.type in ("cancelled", "platform_changed"):
             extra = {"priority": "high", "ttl": 0, "push": {"interruption-level": "time-sensitive"}}
         return format_message(alert, trains), f"sncf_{t.number}_{t.base_departure:%Y%m%d}", extra
 

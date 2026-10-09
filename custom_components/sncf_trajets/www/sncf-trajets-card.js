@@ -1,5 +1,5 @@
 /* Glorp SNCF Trajets card — compact list */
-const VERSION = "0.1.1";
+const VERSION = "0.2.0";
 const TZ = "Europe/Paris";
 
 const esc = (s) =>
@@ -27,15 +27,16 @@ const day = (iso) => {
 
 function row(t, threshold) {
   const label = `${esc(t.mode ?? "")} ${esc(t.number ?? "")}`.trim();
+  const plat = t.platform ? ` <span class="platform">Voie ${esc(t.platform)}</span>` : "";
   if (t.cancelled) {
     return `<div class="row cancelled"><span class="time">🚆 ${hm(t.base_departure)}</span><span class="num">${label}</span><span class="status bad">❌ Supprimé</span></div>`;
   }
   const delayMin = Number(t.delay_minutes) || 0;
   if (delayMin > 0) {
     const cls = delayMin >= threshold ? "warn" : "minor";
-    return `<div class="row"><span class="time">🚆 <s>${hm(t.base_departure)}</s> ${hm(t.departure)}</span><span class="num">${label}</span><span class="status ${cls}">⚠️ +${delayMin}</span></div>`;
+    return `<div class="row"><span class="time">🚆 <s>${hm(t.base_departure)}</s> ${hm(t.departure)}</span><span class="num">${label}${plat}</span><span class="status ${cls}">⚠️ +${delayMin}</span></div>`;
   }
-  return `<div class="row"><span class="time">🚆 ${hm(t.base_departure)}</span><span class="num">${label}</span><span class="status ok">✅ À l'heure</span></div>`;
+  return `<div class="row"><span class="time">🚆 ${hm(t.base_departure)}</span><span class="num">${label}${plat}</span><span class="status ok">✅ À l'heure</span></div>`;
 }
 
 function renderContent(stateObj, config) {
@@ -68,6 +69,7 @@ const STYLE = `
   .row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; padding: 4px 0; align-items: center; }
   .row.cancelled { opacity: .55; }
   .num { color: var(--secondary-text-color); }
+  .platform { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; background: var(--primary-color); color: var(--text-primary-color, #fff); font-weight: 600; font-size: .85em; }
   .ok { color: var(--success-color, #2e7d32); }
   .warn { color: var(--warning-color, #ef6c00); font-weight: 600; }
   .minor { color: var(--secondary-text-color); }

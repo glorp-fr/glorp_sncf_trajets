@@ -4,7 +4,7 @@ from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 DOMAIN = "sncf_trajets"
-VERSION = "0.1.1"
+VERSION = "0.2.0"
 
 API_BASE = "https://api.sncf.com/v1/coverage/sncf"
 NAVITIA_TZ = ZoneInfo("Europe/Paris")
@@ -30,9 +30,13 @@ DEFAULT_THRESHOLD = 5
 DEFAULT_WEEKDAYS = ["mon", "tue", "wed", "thu", "fri"]
 DEFAULT_QUIET_START = "22:00:00"
 DEFAULT_QUIET_END = "06:00:00"
+CONF_PLATFORM_NOTIFY = "platform_notify"
+PLATFORM_NOTIFY_MODES = ["off", "next", "all"]
+DEFAULT_PLATFORM_NOTIFY = "next"
 
 DELAY_CHANGE_STEP = 5
 LOOKBACK = timedelta(minutes=30)
+PLATFORM_LEAD = timedelta(minutes=10)
 
 INTERVAL_ACTIVE = timedelta(minutes=2)
 INTERVAL_IDLE = timedelta(minutes=15)

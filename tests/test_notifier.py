@@ -32,9 +32,9 @@ def entry(hass, **overrides):
     return e
 
 
-def train(delay=0, cancelled=False, number="17716"):
+def train(delay=0, cancelled=False, number="17716", platform=None):
     (t,) = parse_journeys(response([journey(number, at(8, 12), delay=delay)]))
-    return replace(t, cancelled=cancelled)
+    return replace(t, cancelled=cancelled, platform=platform)
 
 
 async def test_push_and_event(hass):
@@ -131,3 +131,60 @@ async def test_state_saved_even_if_push_fails(hass, hass_storage):
     await n.async_process([train(delay=7)], at(7, 0))
     await hass.async_block_till_done()
     assert "17716_20261005T0812" in hass_storage["sncf_trajets.e1"]["data"]["trains"]
+
+
+async def test_platform_push_and_change_priority(hass):
+    calls = async_mock_service(hass, "notify", "mobile_app_pixel")
+    events = async_capture_events(hass, EVENT_ALERT)
+    n = AlertNotifier(hass, entry(hass))
+    await n.async_load()
+    await n.async_process([train(platform="B")], at(8, 2))
+    await n.async_process([train(platform="A")], at(8, 4))
+    await hass.async_block_till_done()
+    assert [c.data["message"] for c in calls] == [
+        "🛤️ TER 17716 08:12 → voie B",
+        "⚠️ TER 17716 08:12 : changement de voie B → A",
+    ]
+    assert "priority" not in calls[0].data["data"]
+    assert calls[1].data["data"]["priority"] == "high"
+    assert calls[1].data["data"]["tag"] == "sncf_17716_20261005"
+    assert events[1].data["platform"] == "A"
+    assert events[1].data["previous_platform"] == "B"
+
+
+async def test_platform_notify_option_off(hass):
+    calls = async_mock_service(hass, "notify", "mobile_app_pixel")
+    n = AlertNotifier(hass, entry(hass, platform_notify="off"))
+    await n.async_load()
+    await n.async_process([train(platform="B")], at(8, 2))
+    await hass.async_block_till_done()
+    assert calls == []
+
+
+async def test_platform_alerts_dropped_in_quiet_hours(hass):
+    calls = async_mock_service(hass, "notify", "mobile_app_pixel")
+    events = async_capture_events(hass, EVENT_ALERT)
+    n = AlertNotifier(hass, entry(hass, quiet_start="07:00:00", quiet_end="08:05:00"))
+    await n.async_load()
+    await n.async_process([train(platform="B")], at(8, 2))  # quiet
+    await n.async_process([train(platform="B")], at(8, 6))  # not quiet anymore
+    await hass.async_block_till_done()
+    assert calls == []  # no summary, no late platform push
+    assert len(events) == 1
+
+
+async def test_platform_push_not_swallowed_by_pending_summary(hass):
+    calls = async_mock_service(hass, "notify", "mobile_app_pixel")
+    n = AlertNotifier(hass, entry(hass, quiet_start="07:00:00", quiet_end="08:05:00"))
+    await n.async_load()
+    await n.async_process([train(delay=7)], at(8, 0))  # quiet -> pending
+    await n.async_process([train(delay=7, platform="B")], at(8, 6))
+    await hass.async_block_till_done()
+    assert [c.data["message"] for c in calls] == ["⚠️ TER 17716 08:12 +7 min", "🛤️ TER 17716 08:12 → voie B"]
+
+
+async def test_platform_state_persisted_without_alert(hass, hass_storage):
+    n = AlertNotifier(hass, entry(hass, platform_notify="off"))
+    await n.async_load()
+    await n.async_process([train(platform="B")], at(8, 2))
+    assert hass_storage["sncf_trajets.e1"]["data"]["trains"]["17716_20261005T0812"]["platform"] == "B"

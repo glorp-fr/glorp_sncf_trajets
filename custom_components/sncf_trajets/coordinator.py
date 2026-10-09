@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -13,6 +14,7 @@ from homeassistant.util import dt as dt_util
 
 from .alerts import AlertNotifier
 from .api import SncfApiClient, SncfApiError, SncfAuthError
+from .boards import BoardClient, BoardError, uic_from_stop_area
 from .const import (
     CONF_COUNT,
     CONF_END,
@@ -25,9 +27,10 @@ from .const import (
     INTERVAL_ACTIVE,
     INTERVAL_MAX,
     LOOKBACK,
+    PLATFORM_LEAD,
     WEEKDAYS,
 )
-from .models import TrajetData
+from .models import Train, TrajetData
 from .schedule import next_window, parse_time, poll_interval
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,6 +45,7 @@ class SncfTrajetCoordinator(DataUpdateCoordinator[TrajetData]):
         entry: ConfigEntry,
         client: SncfApiClient,
         notifier: AlertNotifier,
+        boards: BoardClient,
     ) -> None:
         super().__init__(
             hass,
@@ -52,12 +56,42 @@ class SncfTrajetCoordinator(DataUpdateCoordinator[TrajetData]):
         )
         self.client = client
         self.notifier = notifier
+        self.boards = boards
         self._failures = 0
+        self._platforms: dict[str, str] = {}
+        self._board_failing = False
 
     @property
     def opts(self) -> dict:
         """Entry data merged with options."""
         return {**self.config_entry.data, **self.config_entry.options}
+
+    def _log_board_failure(self, msg: str, err: Exception) -> None:
+        """Warn on the first consecutive board failure, then stay at debug."""
+        _LOGGER.log(logging.DEBUG if self._board_failing else logging.WARNING, msg, err)
+        self._board_failing = True
+
+    async def _async_add_platforms(self, trains: list[Train], now: datetime) -> list[Train]:
+        """Fetch tracks for trains leaving within PLATFORM_LEAD; keep known ones."""
+        ids = {t.id for t in trains}
+        self._platforms = {k: v for k, v in self._platforms.items() if k in ids}
+        due = [t for t in trains if not t.cancelled and t.departure - PLATFORM_LEAD <= now < t.departure]
+        uic = uic_from_stop_area(self.opts[CONF_FROM_ID])
+        if due and uic:
+            try:
+                board = await self.boards.get_platforms(uic)
+            except BoardError as err:
+                self._log_board_failure("Tableau des départs indisponible (%s), voies conservées", err)
+            except Exception as err:  # noqa: BLE001 - the board must never fail the update
+                self._log_board_failure("Tableau des départs en erreur inattendue (%s), voies conservées", err)
+            else:
+                self._board_failing = False
+                for t in due:
+                    if platform := board.get((t.number, t.base_departure)):
+                        self._platforms[t.id] = platform
+                    elif board:
+                        _LOGGER.debug("Voie introuvable au tableau pour %s (%s)", t.number, t.base_departure)
+        return [replace(t, platform=self._platforms.get(t.id)) for t in trains]
 
     async def _async_update_data(self) -> TrajetData:
         opts = self.opts
@@ -96,6 +130,7 @@ class SncfTrajetCoordinator(DataUpdateCoordinator[TrajetData]):
             if window.start <= t.base_departure <= window.end
             and still_ahead(t)
         ][:count]
+        selected = await self._async_add_platforms(selected, now)
         causes = list(dict.fromkeys(t.cause for t in selected if t.cause))
 
         try:

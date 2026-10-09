@@ -31,6 +31,7 @@ from .const import (
     CONF_FROM_ID,
     CONF_FROM_NAME,
     CONF_NOTIFY,
+    CONF_PLATFORM_NOTIFY,
     CONF_QUIET_END,
     CONF_QUIET_START,
     CONF_START,
@@ -39,16 +40,18 @@ from .const import (
     CONF_TO_NAME,
     CONF_WEEKDAYS,
     DEFAULT_COUNT,
+    DEFAULT_PLATFORM_NOTIFY,
     DEFAULT_QUIET_END,
     DEFAULT_QUIET_START,
     DEFAULT_THRESHOLD,
     DEFAULT_WEEKDAYS,
     DOMAIN,
+    PLATFORM_NOTIFY_MODES,
     WEEKDAYS,
 )
 
 SCHEDULE_KEYS = (CONF_START, CONF_END, CONF_WEEKDAYS, CONF_COUNT)
-NOTIFY_KEYS = (CONF_NOTIFY, CONF_THRESHOLD, CONF_QUIET_START, CONF_QUIET_END)
+NOTIFY_KEYS = (CONF_NOTIFY, CONF_THRESHOLD, CONF_PLATFORM_NOTIFY, CONF_QUIET_START, CONF_QUIET_END)
 
 
 def _schedule_schema(d: Mapping[str, Any]) -> dict:
@@ -74,6 +77,13 @@ def _notify_schema(hass: HomeAssistant, d: Mapping[str, Any]) -> dict:
         vol.Required(CONF_THRESHOLD, default=d.get(CONF_THRESHOLD, DEFAULT_THRESHOLD)): vol.All(
             NumberSelector(NumberSelectorConfig(min=1, max=60, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="min")),
             vol.Coerce(int),
+        ),
+        vol.Required(
+            CONF_PLATFORM_NOTIFY, default=d.get(CONF_PLATFORM_NOTIFY, DEFAULT_PLATFORM_NOTIFY)
+        ): SelectSelector(
+            SelectSelectorConfig(
+                options=PLATFORM_NOTIFY_MODES, mode=SelectSelectorMode.LIST, translation_key="platform_notify"
+            )
         ),
         vol.Required(CONF_QUIET_START, default=d.get(CONF_QUIET_START, DEFAULT_QUIET_START)): TimeSelector(),
         vol.Required(CONF_QUIET_END, default=d.get(CONF_QUIET_END, DEFAULT_QUIET_END)): TimeSelector(),
