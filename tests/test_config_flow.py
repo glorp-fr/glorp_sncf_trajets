@@ -50,7 +50,7 @@ async def test_full_flow(hass):
         )
     assert r["type"] is FlowResultType.CREATE_ENTRY
     assert r["title"] == "La Verpillière → Lyon Part-Dieu"
-    assert r["data"] == DATA
+    assert r["data"] == {**DATA, "platform_notify": "next"}
     assert r["result"].unique_id == "stop_area:A_stop_area:B_07:30:00_09:30:00"
 
 
@@ -107,6 +107,21 @@ async def test_options_flow(hass):
     assert r["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["start"] == "17:00:00"
     assert entry.options["count"] == 2
+    assert entry.options["platform_notify"] == "next"
+
+
+async def test_options_flow_platform_notify(hass):
+    entry = MockConfigEntry(domain=DOMAIN, title="A → B", data=DATA)
+    entry.add_to_hass(hass)
+    with patch(SETUP, create=True, return_value=True):
+        r = await hass.config_entries.options.async_init(entry.entry_id)
+        r = await hass.config_entries.options.async_configure(
+            r["flow_id"],
+            {"start": "07:30:00", "end": "09:30:00", "weekdays": ["mon"], "count": 3,
+             "notify": [], "threshold": 5, "quiet_start": "22:00:00", "quiet_end": "06:00:00",
+             "platform_notify": "all"},
+        )
+    assert entry.options["platform_notify"] == "all"
 
 
 async def test_reauth(hass):

@@ -7,7 +7,7 @@
       "to_station": {"title": "Gare d'arrivée", "data": {"query": "Rechercher une gare"}},
       "to_pick": {"title": "Gare d'arrivée", "data": {"station": "Gare"}},
       "schedule": {"title": "Plage horaire", "data": {"start": "De", "end": "À", "weekdays": "Jours", "count": "Nombre de trains"}},
-      "notify": {"title": "Notifications", "description": "Appareils mobiles à prévenir en cas de retard ou suppression.", "data": {"notify": "Appareils", "threshold": "Seuil de retard", "quiet_start": "Début du silence", "quiet_end": "Fin du silence"}},
+      "notify": {"title": "Notifications", "description": "Appareils mobiles à prévenir en cas de retard, suppression ou voie.", "data": {"notify": "Appareils", "threshold": "Seuil de retard", "platform_notify": "Notification de voie", "quiet_start": "Début du silence", "quiet_end": "Fin du silence"}},
       "reauth_confirm": {"title": "Nouvelle clé API", "description": "Une nouvelle clé API est nécessaire : {api_url}", "data": {"api_key": "Clé API"}}
     },
     "error": {
@@ -21,11 +21,12 @@
   },
   "options": {
     "step": {
-      "init": {"title": "Réglages du trajet", "data": {"start": "De", "end": "À", "weekdays": "Jours", "count": "Nombre de trains", "notify": "Appareils", "threshold": "Seuil de retard", "quiet_start": "Début du silence", "quiet_end": "Fin du silence"}}
+      "init": {"title": "Réglages du trajet", "data": {"start": "De", "end": "À", "weekdays": "Jours", "count": "Nombre de trains", "notify": "Appareils", "threshold": "Seuil de retard", "platform_notify": "Notification de voie", "quiet_start": "Début du silence", "quiet_end": "Fin du silence"}}
     },
     "error": {"no_weekday": "Choisissez au moins un jour"}
   },
   "selector": {
+    "platform_notify": {"options": {"off": "Désactivée", "next": "Prochain train uniquement", "all": "Tous les trains"}},
     "weekdays": {"options": {"mon": "Lundi", "tue": "Mardi", "wed": "Mercredi", "thu": "Jeudi", "fri": "Vendredi", "sat": "Samedi", "sun": "Dimanche"}}
   },
   "entity": {
