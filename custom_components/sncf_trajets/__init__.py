@@ -9,6 +9,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .alerts import AlertNotifier
 from .api import SncfApiClient
+from .boards import BoardClient
 from .card import async_register_card
 from .coordinator import SncfTrajetCoordinator
 
@@ -20,10 +21,11 @@ type SncfConfigEntry = ConfigEntry[SncfTrajetCoordinator]
 async def async_setup_entry(hass: HomeAssistant, entry: SncfConfigEntry) -> bool:
     """Set up one trajet."""
     await async_register_card(hass)
-    client = SncfApiClient(async_get_clientsession(hass), entry.data[CONF_API_KEY])
+    session = async_get_clientsession(hass)
+    client = SncfApiClient(session, entry.data[CONF_API_KEY])
     notifier = AlertNotifier(hass, entry)
     await notifier.async_load()
-    coordinator = SncfTrajetCoordinator(hass, entry, client, notifier)
+    coordinator = SncfTrajetCoordinator(hass, entry, client, notifier, BoardClient(session))
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     entry.async_on_unload(entry.add_update_listener(_async_reload))

@@ -33,6 +33,7 @@ DEFAULT_QUIET_END = "06:00:00"
 
 DELAY_CHANGE_STEP = 5
 LOOKBACK = timedelta(minutes=30)
+PLATFORM_LEAD = timedelta(minutes=10)
 
 INTERVAL_ACTIVE = timedelta(minutes=2)
 INTERVAL_IDLE = timedelta(minutes=15)

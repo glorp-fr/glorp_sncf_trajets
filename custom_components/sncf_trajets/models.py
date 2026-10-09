@@ -19,6 +19,7 @@ class Train:
     cancelled: bool = False
     cause: str | None = None
     suspected_cancelled: bool = False
+    platform: str | None = None
 
     @property
     def id(self) -> str:
@@ -43,6 +44,7 @@ class Train:
             "delay_minutes": self.delay_minutes,
             "cancelled": self.cancelled,
             "cause": self.cause,
+            "platform": self.platform,
         }
 
 
