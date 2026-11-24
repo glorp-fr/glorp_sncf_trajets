@@ -16,6 +16,7 @@ from .models import Train
 DEPARTURES_COUNT = 200
 _TAG_RE = re.compile(r"<[^>]+>")
 _DATE_RE = re.compile(r":(\d{4}-\d{2}-\d{2}):")
+_LEGACY_STOP_AREA_RE = re.compile(r"^stop_area:SNCF:(\d{8})$")
 
 
 class SncfApiError(Exception):
@@ -90,6 +91,17 @@ def _disruption_matches_number(disruption: dict, number: str, base_departure: da
     return False
 
 
+def _train_number(info: dict) -> str:
+    """Train number: trip_short_name (headsign is the destination since Nov. 2026)."""
+    return info.get("trip_short_name") or info.get("headsign") or ""
+
+
+def legacy_uic(stop_area_id: str | None) -> str | None:
+    """'stop_area:SNCF:87723395' (ids used until Nov. 2026) -> '87723395'."""
+    match = _LEGACY_STOP_AREA_RE.match(stop_area_id or "")
+    return match.group(1) if match else None
+
+
 def parse_journeys(data: dict[str, Any]) -> list[Train]:
     """Convert a /journeys payload into direct trains."""
     disruptions = data.get("disruptions", [])
@@ -101,7 +113,7 @@ def parse_journeys(data: dict[str, Any]) -> list[Train]:
             continue
         sec = sections[0]
         info = sec.get("display_informations", {})
-        number = info.get("headsign") or info.get("trip_short_name") or ""
+        number = _train_number(info)
         base_departure = _parse_dt(sec.get("base_departure_date_time", sec["departure_date_time"]))
         linked = [
             by_id[link["id"]]
@@ -272,6 +284,32 @@ class SncfApiClient:
             for p in data.get("places", [])
             if p.get("embedded_type") == "stop_area"
         ]
+
+    async def resolve_legacy_stop_area(self, stop_area_id: str) -> str | None:
+        """Map a pre-Nov. 2026 id (stop_area:SNCF:<UIC>) to the current stop_area id.
+
+        Returns None when the id is not a legacy one; raises SncfApiError when
+        the UIC code cannot be found.
+        """
+        uic = legacy_uic(stop_area_id)
+        if uic is None:
+            return None
+        data = await self._get(
+            "stop_points", [("filter", f"stop_point.has_code(UIC,{uic})"), ("depth", "1")]
+        )
+        for point in data.get("stop_points", []):
+            if new_id := (point.get("stop_area") or {}).get("id"):
+                return new_id
+        raise SncfApiError(f"UIC {uic} introuvable")
+
+    async def get_uic(self, stop_area_id: str) -> str | None:
+        """UIC code of a stop_area (needed by the departure boards)."""
+        data = await self._get(f"stop_areas/{stop_area_id}/stop_points", [])
+        for point in data.get("stop_points", []):
+            for code in point.get("codes", []):
+                if code.get("type") == "UIC" and code.get("value"):
+                    return str(code["value"])
+        return None
 
     async def get_trains(
         self, from_id: str, to_id: str, since: datetime, count: int

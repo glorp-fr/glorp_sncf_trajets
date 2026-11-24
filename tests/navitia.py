@@ -15,7 +15,7 @@ def at(h: int, m: int = 0, day: int = 5) -> datetime:
     return datetime(2026, 10, day, h, m, tzinfo=PARIS)
 
 
-def journey(number, base_dep, minutes=23, delay=0, links=(), mode="TER"):
+def journey(number, base_dep, minutes=23, delay=0, links=(), mode="TER", headsign=None):
     base_arr = base_dep + timedelta(minutes=minutes)
     dep = base_dep + timedelta(minutes=delay)
     arr = base_arr + timedelta(minutes=delay)
@@ -26,7 +26,8 @@ def journey(number, base_dep, minutes=23, delay=0, links=(), mode="TER"):
         "base_arrival_date_time": nav(base_arr),
         "arrival_date_time": nav(arr),
         "display_informations": {
-            "headsign": number,
+            "headsign": headsign or number,
+            **({"trip_short_name": number} if headsign else {}),
             "commercial_mode": mode,
             "links": [{"type": "disruption", "id": i} for i in links],
         },

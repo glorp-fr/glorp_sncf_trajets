@@ -318,3 +318,57 @@ async def test_invalid_json_is_api_error(hass, aioclient_mock):
     client = SncfApiClient(async_get_clientsession(hass), "key")
     with pytest.raises(SncfApiError):
         await client.search_stations("x")
+
+
+def test_parse_number_from_trip_short_name_when_headsign_is_destination():
+    """Since Nov. 2026 Navitia puts the destination in headsign, the number in trip_short_name."""
+    (train,) = parse_journeys(response([journey("17606", at(7, 56), headsign="Lyon Part Dieu")]))
+    assert train.number == "17606"
+    assert train.id == "17606_20261005T0756"
+
+
+NEW_FROM = "stop_area:SNC:FR::LMU:8d9565d0-cb0a-11e8-8bfa-f784c1c7c611:"
+
+
+async def test_resolve_legacy_stop_area(hass, aioclient_mock):
+    aioclient_mock.get(
+        f"{API_BASE}/stop_points",
+        json={"stop_points": [{
+            "id": "stop_point:SNC:VSP:FR::LMU:8d9565d0-cb0a-11e8-8bfa-f784c1c7c611:",
+            "stop_area": {"id": NEW_FROM, "name": "La Verpillière"},
+        }]},
+    )
+    client = SncfApiClient(async_get_clientsession(hass), "key")
+    assert await client.resolve_legacy_stop_area("stop_area:SNCF:87723395") == NEW_FROM
+    assert "has_code(UIC,87723395)" in str(aioclient_mock.mock_calls[0][1])
+
+
+async def test_resolve_legacy_ignores_current_ids(hass, aioclient_mock):
+    client = SncfApiClient(async_get_clientsession(hass), "key")
+    assert await client.resolve_legacy_stop_area(NEW_FROM) is None
+    assert aioclient_mock.call_count == 0
+
+
+async def test_resolve_legacy_unknown_uic_is_error(hass, aioclient_mock):
+    aioclient_mock.get(f"{API_BASE}/stop_points", json={"stop_points": []})
+    client = SncfApiClient(async_get_clientsession(hass), "key")
+    with pytest.raises(SncfApiError):
+        await client.resolve_legacy_stop_area("stop_area:SNCF:87723395")
+
+
+async def test_get_uic(hass, aioclient_mock):
+    aioclient_mock.get(
+        f"{API_BASE}/stop_areas/{NEW_FROM}/stop_points",
+        json={"stop_points": [{"codes": [
+            {"type": "netex_quay", "value": "VSP:FR::LMU:x:"},
+            {"type": "UIC", "value": "87723395"},
+        ]}]},
+    )
+    client = SncfApiClient(async_get_clientsession(hass), "key")
+    assert await client.get_uic(NEW_FROM) == "87723395"
+
+
+async def test_get_uic_missing(hass, aioclient_mock):
+    aioclient_mock.get(f"{API_BASE}/stop_areas/{NEW_FROM}/stop_points", json={"stop_points": [{"codes": []}]})
+    client = SncfApiClient(async_get_clientsession(hass), "key")
+    assert await client.get_uic(NEW_FROM) is None

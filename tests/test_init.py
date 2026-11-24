@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 from types import SimpleNamespace
+import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.config_entries import ConfigEntryState
@@ -18,6 +19,13 @@ from .navitia import at, journey, response
 from .test_notifier import DATA
 
 GET_TRAINS = "custom_components.sncf_trajets.api.SncfApiClient.get_trains"
+
+
+@pytest.fixture(autouse=True)
+def _no_uic_lookup():
+    """Fake stop_area ids have no UIC: never hit the network for it."""
+    with patch("custom_components.sncf_trajets.api.SncfApiClient.get_uic", AsyncMock(return_value=None)):
+        yield
 
 
 def sample():
@@ -135,3 +143,53 @@ async def test_options_update_reloads(hass, freezer):
     assert eid(hass, "e1_train_3") is None  # orphaned registry entry removed
     assert hass.states.get("sensor.la_verpilliere_lyon_part_dieu_train_3") is None
     assert hass.states.get(eid(hass, "e1_train_1")).state != "unavailable"
+
+
+RESOLVE = "custom_components.sncf_trajets.api.SncfApiClient.resolve_legacy_stop_area"
+NEW_A = "stop_area:SNC:FR::LMU:aaaa:"
+NEW_B = "stop_area:SNC:FR::LMU:bbbb:"
+
+
+async def test_setup_migrates_legacy_station_ids(hass, freezer):
+    """Ids stop_area:SNCF:<UIC> stopped working in Nov. 2026: rewrite them at setup."""
+    freezer.move_to(at(7, 35))
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="t", unique_id="u", entry_id="e1",
+        data={**DATA, "notify": [], "from_id": "stop_area:SNCF:87723395", "to_id": "stop_area:SNCF:87723197"},
+    )
+    entry.add_to_hass(hass)
+    mapping = {"stop_area:SNCF:87723395": NEW_A, "stop_area:SNCF:87723197": NEW_B}
+    get_trains = AsyncMock(return_value=sample())
+    with patch(RESOLVE, AsyncMock(side_effect=lambda sid: mapping[sid])), patch(GET_TRAINS, get_trains):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    assert entry.data["from_id"] == NEW_A
+    assert entry.data["to_id"] == NEW_B
+    assert entry.data["from_uic"] == "87723395"
+    assert get_trains.await_args.args[:2] == (NEW_A, NEW_B)
+    assert hass.states.get(eid(hass, "e1_train_1")).state == "on_time"
+
+
+async def test_setup_legacy_resolution_failure_retries(hass, freezer):
+    from custom_components.sncf_trajets.api import SncfApiError
+
+    freezer.move_to(at(7, 35))
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="t", unique_id="u", entry_id="e1",
+        data={**DATA, "notify": [], "from_id": "stop_area:SNCF:87723395"},
+    )
+    entry.add_to_hass(hass)
+    with patch(RESOLVE, AsyncMock(side_effect=SncfApiError("HTTP 500"))), patch(GET_TRAINS, AsyncMock(return_value=[])):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert entry.data["from_id"] == "stop_area:SNCF:87723395"
+
+
+async def test_setup_current_ids_untouched(hass, freezer):
+    freezer.move_to(at(7, 35))
+    resolve = AsyncMock(return_value=None)
+    with patch(RESOLVE, resolve):
+        entry = await setup_entry(hass, sample())
+    assert entry.data["from_id"] == "stop_area:A"
+    assert "from_uic" not in entry.data

@@ -29,6 +29,7 @@ def setup(hass):
     entry.add_to_hass(hass)
     client = MagicMock()
     client.get_trains = AsyncMock()
+    client.get_uic = AsyncMock(return_value=None)
     notifier = MagicMock()
     notifier.async_process = AsyncMock()
     boards = MagicMock()
@@ -260,3 +261,54 @@ async def test_unexpected_board_error_keeps_platform(setup_uic, freezer):
     data = await coord._async_update_data()
     assert data.trains[0].platform == "B"
     assert data.stale is False
+
+
+@pytest.fixture
+def setup_netex(hass):
+    """Coordinator on a current (NeTEx) stop_area id: UIC comes from data or the API."""
+    def make(**extra):
+        entry = MockConfigEntry(
+            domain=DOMAIN, title="A → B", entry_id="e3",
+            data={**DATA, "from_id": "stop_area:SNC:FR::LMU:aaaa:", **extra},
+        )
+        entry.add_to_hass(hass)
+        client = MagicMock()
+        client.get_trains = AsyncMock()
+        client.get_uic = AsyncMock(return_value="87723395")
+        notifier = MagicMock()
+        notifier.async_process = AsyncMock()
+        boards = MagicMock()
+        boards.get_platforms = AsyncMock(return_value={})
+        return SncfTrajetCoordinator(hass, entry, client, notifier, boards), client, boards, entry
+    return make
+
+
+async def test_board_uses_stored_uic(setup_netex, freezer):
+    coord, client, boards, _ = setup_netex(from_uic="87723395")
+    freezer.move_to(at(7, 33))
+    client.get_trains.return_value = trains(("B", 7, 42, 0))
+    await coord._async_update_data()
+    boards.get_platforms.assert_awaited_once_with("87723395")
+    client.get_uic.assert_not_awaited()
+
+
+async def test_board_uic_fetched_once_and_cached(setup_netex, freezer):
+    coord, client, boards, entry = setup_netex()
+    client.get_trains.return_value = trains(("B", 7, 42, 0))
+    freezer.move_to(at(7, 33))
+    await coord._async_update_data()
+    freezer.move_to(at(7, 35))
+    await coord._async_update_data()
+    client.get_uic.assert_awaited_once_with("stop_area:SNC:FR::LMU:aaaa:")
+    assert boards.get_platforms.await_count == 2
+    assert "from_uic" not in entry.data  # cached in memory, no entry update (would reload)
+
+
+async def test_board_uic_lookup_failure_is_not_fatal(setup_netex, freezer):
+    coord, client, boards, _ = setup_netex()
+    client.get_uic.side_effect = SncfApiError("HTTP 500")
+    client.get_trains.return_value = trains(("B", 7, 42, 0))
+    freezer.move_to(at(7, 33))
+    data = await coord._async_update_data()
+    boards.get_platforms.assert_not_awaited()
+    assert data.trains[0].platform is None and data.stale is False
