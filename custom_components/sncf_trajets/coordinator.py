@@ -19,6 +19,7 @@ from .const import (
     CONF_COUNT,
     CONF_END,
     CONF_FROM_ID,
+    CONF_FROM_UIC,
     CONF_START,
     CONF_TO_ID,
     CONF_WEEKDAYS,
@@ -60,6 +61,7 @@ class SncfTrajetCoordinator(DataUpdateCoordinator[TrajetData]):
         self._failures = 0
         self._platforms: dict[str, str] = {}
         self._board_failing = False
+        self._uic: str | None = None  # "" = looked up, none found
 
     @property
     def opts(self) -> dict:
@@ -71,12 +73,25 @@ class SncfTrajetCoordinator(DataUpdateCoordinator[TrajetData]):
         _LOGGER.log(logging.DEBUG if self._board_failing else logging.WARNING, msg, err)
         self._board_failing = True
 
+    async def _async_from_uic(self) -> str | None:
+        """UIC code of the departure station, for the departure board."""
+        opts = self.opts
+        if uic := opts.get(CONF_FROM_UIC) or uic_from_stop_area(opts[CONF_FROM_ID]):
+            return uic
+        if self._uic is None:
+            try:
+                self._uic = await self.client.get_uic(opts[CONF_FROM_ID]) or ""
+            except SncfApiError as err:
+                self._log_board_failure("Code UIC de la gare introuvable (%s), voies indisponibles", err)
+                return None
+        return self._uic or None
+
     async def _async_add_platforms(self, trains: list[Train], now: datetime) -> list[Train]:
         """Fetch tracks for trains leaving within PLATFORM_LEAD; keep known ones."""
         ids = {t.id for t in trains}
         self._platforms = {k: v for k, v in self._platforms.items() if k in ids}
         due = [t for t in trains if not t.cancelled and t.departure - PLATFORM_LEAD <= now < t.departure]
-        uic = uic_from_stop_area(self.opts[CONF_FROM_ID])
+        uic = await self._async_from_uic() if due else None
         if due and uic:
             try:
                 board = await self.boards.get_platforms(uic)

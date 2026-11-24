@@ -113,6 +113,10 @@ automation:
 - La voie provient du tableau d'affichage Gares & Connexions (API publique non officielle) : elle n'est demandée que dans les 10 minutes précédant le départ réel d'un train (environ 5 requêtes par train), et son absence ou un refus du site n'affecte jamais le reste des données.
 - Couverture `sncf` de Navitia uniquement ; configuration par l'interface uniquement.
 
+## Changement d'identifiants SNCF (novembre 2026)
+
+En novembre 2026, l'API SNCF (Navitia) a remplacé les identifiants de gares `stop_area:SNCF:<code UIC>` par ceux du référentiel national (`stop_area:SNC:FR::LMU:…`) et place désormais la destination dans `headsign`. Depuis la **v0.2.2**, les trajets existants sont convertis automatiquement au démarrage (rien à reconfigurer) et le numéro du train est lu dans `trip_short_name`. Avec une version antérieure, les trains restent « inconnu » : mettez à jour puis redémarrez Home Assistant.
+
 ## Historique du nom
 
 Depuis la v0.1.1, le projet s'appelle **Glorp SNCF Trajets** et le dépôt `glorp-fr/glorp_sncf_trajets` (auparavant « SNCF Trajets », dépôt `glorp-fr/ha-sncf-trajets` ; GitHub redirige l'ancienne adresse). Le domaine de l'intégration (`sncf_trajets`), les entités et le type de carte (`custom:sncf-trajets-card`) sont inchangés : une installation existante se met à jour normalement depuis HACS, sans reconfiguration. Pensez à fermer/rouvrir l'application mobile après la mise à jour (voir la note de la section « Carte Lovelace »).
